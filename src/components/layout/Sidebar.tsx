@@ -71,10 +71,10 @@ export const Sidebar = () => {
 
       {/* Footer */}
       <div className="border-t border-border p-4 space-y-3">
-        {/* <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">ธีม</span>
           <ThemeToggle />
-        </div> */}
+        </div>
         <Button
           variant="ghost"
           onClick={logout}

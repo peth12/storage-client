@@ -22,7 +22,7 @@ export const Products = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const itemsPerPage = 9; 
+  const itemsPerPage = 9;
   const { toast } = useToast();
   const API_HOST = import.meta.env.VITE_API_HOST;
 
@@ -53,8 +53,20 @@ export const Products = () => {
 
 
 
-  // No need to filter client-side, products are already filtered from API
-  const filteredProducts = products;
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchesSearch =
+        !searchTerm ||
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.type.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesStatus = statusFilter === "all" || p.status === statusFilter;
+      const matchesType = typeFilter === "all" || p.type === typeFilter;
+
+      return matchesSearch && matchesStatus && matchesType;
+    });
+  }, [products, searchTerm, statusFilter, typeFilter]);
+
 
   const productTypes = useMemo(() => {
 
@@ -63,26 +75,26 @@ export const Products = () => {
   }, [products]);
 
   function getStatusProduct(expirationDate: string) {
-  if (!expirationDate) return null;
+    if (!expirationDate) return null;
 
-  const today = new Date();
-  const exp = new Date(expirationDate);
+    const today = new Date();
+    const exp = new Date(expirationDate);
 
-  // Normalize เวลา
-  today.setHours(0, 0, 0, 0);
-  exp.setHours(0, 0, 0, 0);
+    // Normalize เวลา
+    today.setHours(0, 0, 0, 0);
+    exp.setHours(0, 0, 0, 0);
 
-  const diffTime = exp.getTime() - today.getTime();
-  const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    const diffTime = exp.getTime() - today.getTime();
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
-  if (diffDays < 0) {
-    return <Badge className="bg-destructive text-destructive-foreground">หมดอายุ</Badge>;
-  } else if (diffDays <= 7) {
-    return <Badge className="bg-yellow-500 text-black">ใกล้หมดอายุ</Badge>;
-  } else {
-    return <Badge className="bg-green-600 text-white">ปกติ</Badge>;
+    if (diffDays < 0) {
+      return <Badge className="bg-destructive text-destructive-foreground">หมดอายุ</Badge>;
+    } else if (diffDays <= 7) {
+      return <Badge className="bg-yellow-500 text-black">ใกล้หมดอายุ</Badge>;
+    } else {
+      return <Badge className="bg-green-600 text-white">ปกติ</Badge>;
+    }
   }
-}
 
   // ...existing code...
   const handleSaveProduct = async (productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -131,17 +143,17 @@ export const Products = () => {
     setShowForm(true);
   };
 
-const handleDeleteProduct = async (product: Product) => {
-  if (!product) return;
-  try {
-    await axios.delete(`${API_HOST}/api/products/${product._id || product.id}`);
-    const updatedProducts = products.filter(p => (p._id || p.id) !== (product._id || product.id));
-    setProducts(updatedProducts);
-    toast({ title: 'ลบสินค้าสำเร็จ', description: 'สินค้าได้รับการลบออกจากระบบแล้ว' });
-  } catch (error) {
-    toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถลบสินค้าได้' });
-  }
-};
+  const handleDeleteProduct = async (product: Product) => {
+    if (!product) return;
+    try {
+      await axios.delete(`${API_HOST}/api/products/${product._id || product.id}`);
+      const updatedProducts = products.filter(p => (p._id || p.id) !== (product._id || product.id));
+      setProducts(updatedProducts);
+      toast({ title: 'ลบสินค้าสำเร็จ', description: 'สินค้าได้รับการลบออกจากระบบแล้ว' });
+    } catch (error) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถลบสินค้าได้' });
+    }
+  };
 
   const handleViewDetails = (product: Product) => {
     setSelectedProduct(product);
@@ -328,27 +340,27 @@ const handleDeleteProduct = async (product: Product) => {
 
       {/* Pagination Controls */}
       {/* {totalPages > 1 && ( */}
-        <div className="flex justify-center items-center gap-2 mt-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-          >
-            ก่อนหน้า
-          </Button>
-          <span className="mx-2 text-sm">
-            หน้า {currentPage} / {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-          >
-            ถัดไป
-          </Button>
-        </div>
+      <div className="flex justify-center items-center gap-2 mt-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+          disabled={currentPage === 1}
+        >
+          ก่อนหน้า
+        </Button>
+        <span className="mx-2 text-sm">
+          หน้า {currentPage} / {totalPages}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+          disabled={currentPage === totalPages}
+        >
+          ถัดไป
+        </Button>
+      </div>
       {/* )} */}
 
       {filteredProducts.length === 0 && (
