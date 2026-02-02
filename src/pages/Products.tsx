@@ -74,7 +74,7 @@ export const Products = () => {
     return Array.from(new Set(products.map(p => p.type)));
   }, [products]);
 
-  function getStatusProduct(expirationDate: string) {
+  function getStatusProduct(expirationDate: string, quantity: number) {
     if (!expirationDate) return null;
 
     const today = new Date();
@@ -87,13 +87,19 @@ export const Products = () => {
     const diffTime = exp.getTime() - today.getTime();
     const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
-    if (diffDays < 0) {
-      return <Badge className="bg-destructive text-destructive-foreground">หมดอายุ</Badge>;
-    } else if (diffDays <= 7) {
-      return <Badge className="bg-yellow-500 text-black">ใกล้หมดอายุ</Badge>;
+    if (quantity === 0) {
+      return <Badge className="bg-destructive text-destructive-foreground">สินค้าหมด</Badge>;
     } else {
-      return <Badge className="bg-green-600 text-white">ปกติ</Badge>;
+      if (diffDays < 0) {
+        return <Badge className="bg-destructive text-destructive-foreground">หมดอายุ</Badge>;
+      } else if (diffDays <= 7) {
+        return <Badge className="bg-yellow-500 text-black">ใกล้หมดอายุ</Badge>;
+      } else {
+        return <Badge className="bg-green-600 text-white">ปกติ</Badge>;
+      }
     }
+
+
   }
 
   // ...existing code...
@@ -279,7 +285,7 @@ export const Products = () => {
               <div className="flex justify-between items-start">
                 <CardTitle className="text-lg text-foreground">{product.name}</CardTitle>
                 {getStatusBadge(product.status)}
-                {getStatusProduct(product.expirationDate)}
+                {getStatusProduct(product.expirationDate, product.quantity)}
               </div>
               <p className="text-sm text-muted-foreground">{product.type}</p>
             </CardHeader>

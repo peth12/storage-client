@@ -26,6 +26,7 @@ export const Dashboard = () => {
   const [bills, setBills] = useState<Bill[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [showBillForm, setShowBillForm] = useState(false);
+  const [information, setInformation] = useState<any>(null);
   const API_HOST = import.meta.env.VITE_API_HOST;
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -35,10 +36,16 @@ export const Dashboard = () => {
       const response = await axios.get(`${API_HOST}/api/products/low-stock`);
       const responseProducts = await axios.get(`${API_HOST}/api/products`);
       const responseExpired = await axios.get(`${API_HOST}/api/products/expired`);
+      const responseInformation = await axios.get(`${API_HOST}/api/dashboard`);
+      console.log('Low stock products:', response.data);
+      console.log('Expired products:', responseExpired.data);
       setProducts(Array.isArray(responseProducts.data.items) ? responseProducts.data.items : []);
       setLowProducts(Array.isArray(response.data) ? response.data : []);
-      setExpiredProducts(Array.isArray(responseExpired.data) ? responseExpired.data : []);
-      setBills(LocalStorage.getBills());
+      setInformation(responseInformation.data);
+
+      setExpiredProducts(responseExpired.data);
+
+      // setBills();
     };
     fetchLowStockProducts();
   }, []);
@@ -110,9 +117,7 @@ export const Dashboard = () => {
     }
   };
 
-  const totalProducts = products.length;
-  const activeProducts = products.filter(p => p.status === 'active').length;
-  const outOfStock = products.filter(p => p.status === 'out_of_stock').length;
+
   const totalBills = bills.length;
   const totalRevenue = bills
     .filter(b => b.status === 'completed')
@@ -166,9 +171,9 @@ export const Dashboard = () => {
             <Package className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{totalProducts}</div>
+            <div className="text-2xl font-bold text-foreground">{information?.totalProducts}</div>
             <p className="text-xs text-muted-foreground">
-              สินค้าที่ใช้งาน {activeProducts} รายการ
+              สินค้าที่ใช้งาน {information?.totalProducts} รายการ
             </p>
           </CardContent>
         </Card>
@@ -181,7 +186,7 @@ export const Dashboard = () => {
             <AlertTriangle className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{outOfStock}</div>
+            <div className="text-2xl font-bold text-foreground">{information?.totalSoldProducts}</div>
             <p className="text-xs text-muted-foreground">
               ต้องเติมสต็อก
             </p>
@@ -196,7 +201,7 @@ export const Dashboard = () => {
             <Receipt className="h-4 w-4 text-info" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{totalBills}</div>
+            <div className="text-2xl font-bold text-foreground">{information?.totalBills}</div>
             <p className="text-xs text-muted-foreground">
               ธุรกรรมทั้งหมด
             </p>
@@ -212,7 +217,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              ฿{totalRevenue.toLocaleString()}
+              ฿{information?.totalIncome.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
               จากบิลที่เสร็จสมบูรณ์
@@ -288,9 +293,9 @@ export const Dashboard = () => {
             </Button>
           </CardHeader>
           <CardContent>
-            {lowStockProducts.length === 0 ? (
+            {expiredProducts.length === 0 ? (
               <p className="text-muted-foreground text-center py-4">
-                ไม่มีสินค้าที่ใกล้หมด
+                ไม่มีสินค้าที่หมดอายุ
               </p>
             ) : (
               <div className="space-y-3">
@@ -300,14 +305,14 @@ export const Dashboard = () => {
                     className="flex items-center justify-between p-3 bg-surface-variant rounded-lg"
                   >
                     <div>
-                      <p className="font-medium text-foreground">{product.name}</p>
+                      <p className="font-medium text-red-600">{product.name}</p>
                       <p className="text-sm text-muted-foreground">{product.type}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium text-warning">
+                      <p className="font-medium text-red-600">
                         เหลือ {product.quantity} ชิ้น
                       </p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-red-600">
                         ฿{product.price.toLocaleString()}
                       </p>
                     </div>
