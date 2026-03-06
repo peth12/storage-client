@@ -7,47 +7,7 @@ const STORAGE_KEYS = {
 };
 
 // Mock initial data
-const INITIAL_PRODUCTS: Product[] = [
-  {
-    id: '1',
-    name: 'iPhone 15 Pro',
-    type: 'Electronics',
-    quantity: 25,
-    price: 45000,
-    cost: 40000,
-    profit: 5000,
-    status: 'active',
-    expirationDate: undefined,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: '2',
-    name: 'Samsung Galaxy S24',
-    type: 'Electronics',
-    quantity: 15,
-    price: 35000,
-    cost: 30000,
-    profit: 5000,
-    status: 'active',
-    expirationDate: undefined,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: '3',
-    name: 'MacBook Air M2',
-    type: 'Computer',
-    quantity: 0,
-    price: 55000,
-    cost: 50000,
-    profit: 5000,
-    status: 'out_of_stock',
-    expirationDate: undefined,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  }
-];
+const INITIAL_PRODUCTS: Product[] = [];
 
 export class LocalStorage {
   static getProducts(): Product[] {
