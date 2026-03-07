@@ -1,24 +1,48 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Product, Bill, StockTransaction } from '@/types';
-import { LocalStorage } from '@/lib/storage';
 import { exportToExcel } from '@/lib/excel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Download, FileSpreadsheet, Filter, Calendar } from 'lucide-react';
+import { Download, FileSpreadsheet, Filter, Calendar, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import axios from 'axios';
 
 export const Reports = () => {
-  const [products] = useState<Product[]>(LocalStorage.getProducts());
-  const [bills] = useState<Bill[]>(LocalStorage.getBills());
-  const [transactions] = useState<StockTransaction[]>(LocalStorage.getTransactions());
+  const [products, setProducts] = useState<Product[]>([]);
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [transactions, setTransactions] = useState<StockTransaction[]>([]);
+  const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const { toast } = useToast();
+  const API_HOST = import.meta.env.VITE_API_HOST;
+
+  useEffect(() => {
+    const fetchReportData = async () => {
+      try {
+        setLoading(true);
+        const [prodRes, billRes, txRes] = await Promise.all([
+          axios.get(`${API_HOST}/api/products`, { params: { limit: 9999 } }),
+          axios.get(`${API_HOST}/api/bills`, { params: { limit: 9999 } }),
+          axios.get(`${API_HOST}/api/transactions`, { params: { limit: 9999 } }),
+        ]);
+        setProducts(Array.isArray(prodRes.data.items) ? prodRes.data.items : []);
+        setBills(Array.isArray(billRes.data.items) ? billRes.data.items : []);
+        setTransactions(Array.isArray(txRes.data.items) ? txRes.data.items : []);
+      } catch (error) {
+        console.error('Error fetching report data:', error);
+        toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถโหลดข้อมูลรายงานได้' });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchReportData();
+  }, [API_HOST]);
 
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
@@ -152,6 +176,17 @@ export const Reports = () => {
     exportToExcel(data, 'สรุปรายงาน');
     toast({ title: 'ส่งออกสำเร็จ', description: 'ไฟล์สรุปรายงานได้รับการส่งออกแล้ว' });
   };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="text-center space-y-3">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">กำลังโหลดข้อมูลรายงาน...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
