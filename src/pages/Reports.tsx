@@ -138,8 +138,8 @@ export const Reports = () => {
       'อัปเดตล่าสุด': new Date(bill.updatedAt).toLocaleDateString('th-TH')
     }));
 
-    exportToExcel(data, 'รายงานบิล');
-    toast({ title: 'ส่งออกสำเร็จ', description: 'ไฟล์รายงานบิลได้รับการส่งออกแล้ว' });
+    exportToExcel(data, 'รายงานบิล / ขาย');
+    toast({ title: 'ส่งออกสำเร็จ', description: 'ไฟล์รายงานบิล / ขายได้รับการส่งออกแล้ว' });
   };
 
   const exportTransactions = () => {
@@ -291,7 +291,7 @@ export const Reports = () => {
       <Tabs defaultValue="products" className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="products">รายงานสินค้า</TabsTrigger>
-          <TabsTrigger value="bills">รายงานบิล</TabsTrigger>
+          <TabsTrigger value="bills">รายงานบิล / ขาย</TabsTrigger>
           <TabsTrigger value="transactions">การเคลื่อนไหวสต็อก</TabsTrigger>
           <TabsTrigger value="summary">สรุปรายงาน</TabsTrigger>
         </TabsList>
@@ -354,7 +354,7 @@ export const Reports = () => {
         <TabsContent value="bills" className="space-y-4">
           <Card className="bg-surface border-border">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>รายงานบิล ({filteredBills.length} รายการ)</CardTitle>
+              <CardTitle>รายงานบิล / ขาย ({filteredBills.length} รายการ)</CardTitle>
               <Button onClick={exportBills} className="bg-primary hover:bg-primary/90">
                 <Download className="mr-2 h-4 w-4" />
                 ส่งออก Excel

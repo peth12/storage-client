@@ -15,7 +15,7 @@ import {
 const navigation = [
   { name: 'หน้าหลัก', href: '/dashboard', icon: Home },
   { name: 'จัดการสินค้า', href: '/products', icon: Package },
-  { name: 'จัดการบิล', href: '/bills', icon: Receipt },
+  { name: 'จัดการบิล / ขาย', href: '/bills', icon: Receipt },
   { name: 'รายงาน', href: '/reports', icon: FileBarChart },
 ];
 
