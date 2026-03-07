@@ -58,7 +58,7 @@ export const BillDetails = ({ bill, onBack }: BillDetailsProps) => {
           กลับ
         </Button>
         <div className="flex justify-between items-center print:block">
-          <h1 className="text-2xl font-bold text-foreground">รายละเอียดบิล</h1>
+          <h1 className="text-2xl font-bold text-foreground">รายละเอียดบิล / ขาย</h1>
           <Button onClick={handlePrint} className="bg-primary hover:bg-primary/90 print:hidden">
             <ExternalLink className="mr-2 h-4 w-4" />
             ดูบิลมาตรฐาน
@@ -172,12 +172,6 @@ export const BillDetails = ({ bill, onBack }: BillDetailsProps) => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <div className="text-sm text-muted-foreground">รหัสบิล</div>
-                <div className="font-mono text-xs bg-surface-variant p-2 rounded mt-1">
-                  {bill.id}
-                </div>
-              </div>
               <div>
                 <div className="text-sm text-muted-foreground">อัปเดตล่าสุด</div>
                 <div className="text-foreground">{formatDate(bill.updatedAt)}</div>
