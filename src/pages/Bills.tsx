@@ -1,24 +1,23 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Bill, Product } from '@/types';
+import { Bill } from '@/types';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Eye, FileText } from 'lucide-react';
-import { BillForm } from '@/components/bills/BillForm';
+import { Search, Eye, FileText, ShoppingCart } from 'lucide-react';
 import { BillDetails } from '@/components/bills/BillDetails';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 export const Bills = () => {
   const [bills, setBills] = useState<Bill[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [showForm, setShowForm] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
@@ -50,49 +49,8 @@ export const Bills = () => {
     fetchBills();
   }, [API_HOST, currentPage, itemsPerPage, searchTerm, statusFilter]);
 
-  // Fetch products for bill form (if needed)
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const response = await axios.get(`${API_HOST}/api/products`);
-        setProducts(Array.isArray(response.data.items) ? response.data.items : []);
-      } catch (error) {
-        // Optionally handle error
-      }
-    };
-    fetchProducts();
-  }, [API_HOST]);
-
   // No need to filter client-side, bills are already filtered from API
   const filteredBills = bills;
-
-
-  const handleSaveBill = async (billData: Omit<Bill, 'id' | 'createdAt' | 'updatedAt'>) => {
-    try {
-      const payload = {
-        items: billData.items.map((item: any) => ({
-          productId: item.productId,
-          quantity: item.quantity
-        })),
-        status: billData.status,
-        createdBy: billData.createdBy
-      };
-      const response = await axios.post(`${API_HOST}/api/bills`, payload);
-      const newBill: Bill = {
-        ...response.data,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      setBills([...bills, newBill]);
-      setShowForm(false);
-      toast({
-        title: 'สร้างบิลสำเร็จ',
-        description: `บิลเลขที่ ${newBill.billNumber} ได้รับการสร้างแล้ว`
-      });
-    } catch (error) {
-      toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถสร้างบิลได้' });
-    }
-  };
 
   const handleViewDetails = (bill: Bill) => {
     setSelectedBill(bill);
@@ -129,16 +87,6 @@ export const Bills = () => {
     });
   };
 
-  if (showForm) {
-    return (
-      <BillForm
-        products={products}
-        onSave={handleSaveBill}
-        onCancel={() => setShowForm(false)}
-      />
-    );
-  }
-
   if (showDetails && selectedBill) {
     return (
       <BillDetails
@@ -154,10 +102,13 @@ export const Bills = () => {
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-foreground">จัดการบิล</h1>
-        <Button onClick={() => setShowForm(true)} className="bg-primary hover:bg-primary/90">
-          <Plus className="mr-2 h-4 w-4" />
-          สร้างบิลใหม่
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">บิล</h1>
+          <p className="text-sm text-muted-foreground">ดูรายการบิลและประวัติการขายทั้งหมด</p>
+        </div>
+        <Button onClick={() => navigate('/sales')} className="bg-primary hover:bg-primary/90">
+          <ShoppingCart className="mr-2 h-4 w-4" />
+          ไปหน้าขาย
         </Button>
       </div>
 
@@ -180,7 +131,7 @@ export const Bills = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className="rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
             >
               <option value="all">สถานะทั้งหมด</option>
               <option value="draft">ฉบับร่าง</option>

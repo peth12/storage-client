@@ -9,14 +9,31 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Download, FileSpreadsheet, Filter, Calendar, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
+import { getPeriodLabel, getPeriodRange, isWithinDateRange, periodOptions, ReportPeriod } from '@/lib/period';
+
+const initialRange = getPeriodRange('day');
+
+const getEffectiveProductStatus = (product: Product): Product['status'] => {
+  if (product.quantity === 0) return 'out_of_stock';
+  if (product.status === 'out_of_stock') return 'active';
+  return product.status;
+};
+
+const getProductStatusLabel = (product: Product) => {
+  const status = getEffectiveProductStatus(product);
+  if (status === 'active') return 'พร้อมขาย';
+  if (status === 'inactive') return 'ไม่พร้อมขาย';
+  return 'สินค้าหมด';
+};
 
 export const Reports = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [period, setPeriod] = useState<ReportPeriod>('day');
+  const [startDate, setStartDate] = useState(initialRange.startInput);
+  const [endDate, setEndDate] = useState(initialRange.endInput);
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const { toast } = useToast();
@@ -44,9 +61,26 @@ export const Reports = () => {
     fetchReportData();
   }, [API_HOST]);
 
+  const handlePeriodChange = (nextPeriod: Exclude<ReportPeriod, 'custom'>) => {
+    const range = getPeriodRange(nextPeriod);
+    setPeriod(nextPeriod);
+    setStartDate(range.startInput);
+    setEndDate(range.endInput);
+  };
+
+  const handleStartDateChange = (value: string) => {
+    setPeriod('custom');
+    setStartDate(value);
+  };
+
+  const handleEndDateChange = (value: string) => {
+    setPeriod('custom');
+    setEndDate(value);
+  };
+
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
-      const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' || getEffectiveProductStatus(product) === statusFilter;
       const matchesType = typeFilter === 'all' || product.type === typeFilter;
       return matchesStatus && matchesType;
     });
@@ -54,23 +88,13 @@ export const Reports = () => {
 
   const filteredBills = useMemo(() => {
     return bills.filter(bill => {
-      const billDate = new Date(bill.createdAt);
-      const start = startDate ? new Date(startDate) : null;
-      const end = endDate ? new Date(endDate) : null;
-      
-      const matchesDate = (!start || billDate >= start) && (!end || billDate <= end);
-      return matchesDate;
+      return isWithinDateRange(bill.createdAt, startDate, endDate);
     });
   }, [bills, startDate, endDate]);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(transaction => {
-      const transactionDate = new Date(transaction.createdAt);
-      const start = startDate ? new Date(startDate) : null;
-      const end = endDate ? new Date(endDate) : null;
-      
-      const matchesDate = (!start || transactionDate >= start) && (!end || transactionDate <= end);
-      return matchesDate;
+      return isWithinDateRange(transaction.createdAt, startDate, endDate);
     });
   }, [transactions, startDate, endDate]);
 
@@ -80,8 +104,8 @@ export const Reports = () => {
 
   const summary = useMemo(() => {
     const totalProducts = products.length;
-    const activeProducts = products.filter(p => p.status === 'active').length;
-    const outOfStock = products.filter(p => p.status === 'out_of_stock').length;
+    const activeProducts = products.filter(p => getEffectiveProductStatus(p) === 'active').length;
+    const outOfStock = products.filter(p => getEffectiveProductStatus(p) === 'out_of_stock').length;
     const totalValue = products.reduce((sum, p) => sum + (p.cost * p.quantity), 0);
     const totalSalesValue = products.reduce((sum, p) => sum + (p.price * p.quantity), 0);
     const totalProfit = totalSalesValue - totalValue;
@@ -89,6 +113,9 @@ export const Reports = () => {
     const completedBills = filteredBills.filter(b => b.status === 'completed');
     const totalSales = completedBills.reduce((sum, b) => sum + b.total, 0);
     const avgBillValue = completedBills.length > 0 ? totalSales / completedBills.length : 0;
+    const soldItems = filteredTransactions
+      .filter(transaction => transaction.type === 'out')
+      .reduce((sum, transaction) => sum + transaction.quantity, 0);
     
     return {
       totalProducts,
@@ -100,21 +127,24 @@ export const Reports = () => {
       totalSales,
       avgBillValue,
       totalBills: filteredBills.length,
-      completedBills: completedBills.length
+      completedBills: completedBills.length,
+      soldItems,
+      stockMovements: filteredTransactions.length
     };
-  }, [products, filteredBills]);
+  }, [products, filteredBills, filteredTransactions]);
+
+  const periodLabel = getPeriodLabel(period, startDate, endDate);
 
   const exportProducts = () => {
     const data = filteredProducts.map(product => ({
-      'รหัสสินค้า': product.id,
+      'รหัสสินค้า': product.appId || product._id || product.id,
       'ชื่อสินค้า': product.name,
       'ประเภท': product.type,
       'จำนวนคงเหลือ': product.quantity,
       'ราคาต้นทุน': product.cost,
       'ราคาขาย': product.price,
       'กำไร': product.profit,
-      'สถานะ': product.status === 'active' ? 'พร้อมขาย' : 
-              product.status === 'inactive' ? 'ไม่พร้อมขาย' : 'สินค้าหมด',
+      'สถานะ': getProductStatusLabel(product),
       'วันหมดอายุ': product.expirationDate || '',
       'วันที่สร้าง': new Date(product.createdAt).toLocaleDateString('th-TH'),
       'อัปเดตล่าสุด': new Date(product.updatedAt).toLocaleDateString('th-TH')
@@ -161,6 +191,7 @@ export const Reports = () => {
 
   const exportSummary = () => {
     const data = [
+      { 'หัวข้อ': 'ช่วงข้อมูล', 'ค่า': periodLabel },
       { 'หัวข้อ': 'จำนวนสินค้าทั้งหมด', 'ค่า': summary.totalProducts },
       { 'หัวข้อ': 'สินค้าพร้อมขาย', 'ค่า': summary.activeProducts },
       { 'หัวข้อ': 'สินค้าหมด', 'ค่า': summary.outOfStock },
@@ -170,7 +201,9 @@ export const Reports = () => {
       { 'หัวข้อ': 'ยอดขายรวม (บาท)', 'ค่า': summary.totalSales },
       { 'หัวข้อ': 'ค่าเฉลี่ยต่อบิล (บาท)', 'ค่า': summary.avgBillValue },
       { 'หัวข้อ': 'จำนวนบิลทั้งหมด', 'ค่า': summary.totalBills },
-      { 'หัวข้อ': 'บิลที่เสร็จสิ้น', 'ค่า': summary.completedBills }
+      { 'หัวข้อ': 'บิลที่เสร็จสิ้น', 'ค่า': summary.completedBills },
+      { 'หัวข้อ': 'สินค้าที่ขายออก', 'ค่า': summary.soldItems },
+      { 'หัวข้อ': 'รายการเคลื่อนไหวสต็อก', 'ค่า': summary.stockMovements }
     ];
 
     exportToExcel(data, 'สรุปรายงาน');
@@ -191,8 +224,34 @@ export const Reports = () => {
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-foreground">รายงานและส่งออกข้อมูล</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">รายงานและส่งออกข้อมูล</h1>
+          <p className="text-sm text-muted-foreground">{periodLabel}</p>
+        </div>
       </div>
+
+      <Card className="bg-surface border-border">
+        <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="font-medium text-foreground">ช่วงเวลารายงาน</div>
+            <div className="text-sm text-muted-foreground">เลือกดูข้อมูลรายวัน รายเดือน หรือรายปี</div>
+          </div>
+          <div className="flex rounded-md border border-border bg-background p-1">
+            {periodOptions.map(option => (
+              <Button
+                key={option.value}
+                type="button"
+                size="sm"
+                variant={period === option.value ? 'default' : 'ghost'}
+                onClick={() => handlePeriodChange(option.value)}
+                className={period === option.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -208,7 +267,7 @@ export const Reports = () => {
           <CardContent className="p-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-accent">฿{summary.totalSales.toLocaleString()}</div>
-              <div className="text-sm text-muted-foreground">ยอดขายรวม</div>
+              <div className="text-sm text-muted-foreground">ยอดขายรวม ({periodLabel})</div>
             </div>
           </CardContent>
         </Card>
@@ -216,15 +275,15 @@ export const Reports = () => {
           <CardContent className="p-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-foreground">{summary.completedBills}</div>
-              <div className="text-sm text-muted-foreground">บิลที่เสร็จสิ้น</div>
+              <div className="text-sm text-muted-foreground">บิลที่เสร็จสิ้น ({periodLabel})</div>
             </div>
           </CardContent>
         </Card>
         <Card className="bg-surface border-border">
           <CardContent className="p-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-accent">฿{summary.totalProfit.toLocaleString()}</div>
-              <div className="text-sm text-muted-foreground">กำไรคาดการณ์</div>
+              <div className="text-2xl font-bold text-accent">{summary.soldItems}</div>
+              <div className="text-sm text-muted-foreground">สินค้าที่ขายออก ({periodLabel})</div>
             </div>
           </CardContent>
         </Card>
@@ -245,7 +304,7 @@ export const Reports = () => {
               <Input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => handleStartDateChange(e.target.value)}
                 className="mt-1"
               />
             </div>
@@ -254,7 +313,7 @@ export const Reports = () => {
               <Input
                 type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(e) => handleEndDateChange(e.target.value)}
                 className="mt-1"
               />
             </div>
@@ -263,7 +322,7 @@ export const Reports = () => {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
               >
                 <option value="all">ทั้งหมด</option>
                 <option value="active">พร้อมขาย</option>
@@ -276,7 +335,7 @@ export const Reports = () => {
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
               >
                 <option value="all">ทั้งหมด</option>
                 {productTypes.map(type => (
@@ -311,6 +370,7 @@ export const Reports = () => {
                   <thead>
                     <tr className="border-b border-border">
                       <th className="text-left py-2 text-muted-foreground">สินค้า</th>
+                      <th className="text-left py-2 text-muted-foreground">รหัส</th>
                       <th className="text-right py-2 text-muted-foreground">คงเหลือ</th>
                       <th className="text-right py-2 text-muted-foreground">ต้นทุน</th>
                       <th className="text-right py-2 text-muted-foreground">ราคาขาย</th>
@@ -327,14 +387,16 @@ export const Reports = () => {
                             <div className="text-xs text-muted-foreground">{product.type}</div>
                           </div>
                         </td>
+                        <td className="py-2 font-mono text-xs text-muted-foreground">
+                          {product.appId || product._id || product.id || '-'}
+                        </td>
                         <td className="py-2 text-right text-foreground">{product.quantity}</td>
                         <td className="py-2 text-right text-foreground">฿{product.cost.toLocaleString()}</td>
                         <td className="py-2 text-right text-foreground">฿{product.price.toLocaleString()}</td>
                         <td className="py-2 text-right text-accent">฿{product.profit.toLocaleString()}</td>
                         <td className="py-2 text-center">
-                          <Badge variant={product.status === 'active' ? 'default' : 'secondary'}>
-                            {product.status === 'active' ? 'พร้อมขาย' : 
-                             product.status === 'inactive' ? 'ไม่พร้อมขาย' : 'สินค้าหมด'}
+                          <Badge variant={getEffectiveProductStatus(product) === 'active' ? 'default' : 'secondary'}>
+                            {getProductStatusLabel(product)}
                           </Badge>
                         </td>
                       </tr>
@@ -354,7 +416,7 @@ export const Reports = () => {
         <TabsContent value="bills" className="space-y-4">
           <Card className="bg-surface border-border">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>รายงานบิล / ขาย ({filteredBills.length} รายการ)</CardTitle>
+              <CardTitle>รายงานบิล / ขาย ({filteredBills.length} รายการ - {periodLabel})</CardTitle>
               <Button onClick={exportBills} className="bg-primary hover:bg-primary/90">
                 <Download className="mr-2 h-4 w-4" />
                 ส่งออก Excel
@@ -404,7 +466,7 @@ export const Reports = () => {
         <TabsContent value="transactions" className="space-y-4">
           <Card className="bg-surface border-border">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>การเคลื่อนไหวสต็อก ({filteredTransactions.length} รายการ)</CardTitle>
+              <CardTitle>การเคลื่อนไหวสต็อก ({filteredTransactions.length} รายการ - {periodLabel})</CardTitle>
               <Button onClick={exportTransactions} className="bg-primary hover:bg-primary/90">
                 <Download className="mr-2 h-4 w-4" />
                 ส่งออก Excel
@@ -454,7 +516,7 @@ export const Reports = () => {
         <TabsContent value="summary" className="space-y-4">
           <Card className="bg-surface border-border">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>สรุปรายงานระบบ</CardTitle>
+              <CardTitle>สรุปรายงานระบบ ({periodLabel})</CardTitle>
               <Button onClick={exportSummary} className="bg-primary hover:bg-primary/90">
                 <Download className="mr-2 h-4 w-4" />
                 ส่งออก Excel
@@ -498,6 +560,14 @@ export const Reports = () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">บิลที่เสร็จสิ้น:</span>
                       <span className="text-foreground">{summary.completedBills} บิล</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">สินค้าที่ขายออก:</span>
+                      <span className="text-foreground">{summary.soldItems} ชิ้น</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">รายการเคลื่อนไหวสต็อก:</span>
+                      <span className="text-foreground">{summary.stockMovements} รายการ</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">ยอดขายรวม:</span>

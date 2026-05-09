@@ -21,7 +21,7 @@ export const BillForm = ({ products, onSave, onCancel }: BillFormProps) => {
   const [quantity, setQuantity] = useState(1);
 
   const availableProducts = products.filter(p => 
-    p.status === 'active' && 
+    p.status !== 'inactive' &&
     p.quantity > 0 &&
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );

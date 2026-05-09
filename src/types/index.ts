@@ -9,6 +9,7 @@ export interface User {
 export interface Product {
   id: string;
   _id?: string;
+  appId?: string;
   name: string;
   type: string;
   quantity: number;

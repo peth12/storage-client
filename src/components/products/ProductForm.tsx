@@ -14,13 +14,18 @@ interface ProductFormProps {
 
 export const ProductForm = ({ product, onSave, onCancel }: ProductFormProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const initialStatus: Product['status'] =
+    product?.quantity && product.quantity > 0 && product.status === 'out_of_stock'
+      ? 'active'
+      : product?.status || 'active';
   const [formData, setFormData] = useState({
+    appId: product?.appId || product?._id || product?.id || '',
     name: product?.name || '',
     type: product?.type || '',
     quantity: product?.quantity || 0,
     price: product?.price || 0,
     cost: product?.cost || 0,
-    status: product?.status || 'active' as Product['status'],
+    status: initialStatus,
     expirationDate: product?.expirationDate || '',
     image: product?.image || ''
   });
@@ -89,6 +94,18 @@ export const ProductForm = ({ product, onSave, onCancel }: ProductFormProps) => 
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <Label htmlFor="appId" className="text-foreground">รหัสสินค้า</Label>
+              <Input
+                id="appId"
+                type="text"
+                value={formData.appId}
+                onChange={(e) => handleInputChange('appId', e.target.value)}
+                placeholder="เช่น SKU-001"
+                className="mt-1"
+              />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="name" className="text-foreground">ชื่อสินค้า *</Label>
@@ -163,7 +180,7 @@ export const ProductForm = ({ product, onSave, onCancel }: ProductFormProps) => 
                   id="status"
                   value={formData.status}
                   onChange={(e) => handleInputChange('status', e.target.value as Product['status'])}
-                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
                 >
                   <option value="active">พร้อมขาย</option>
                   <option value="inactive">ไม่พร้อมขาย</option>
@@ -186,7 +203,7 @@ export const ProductForm = ({ product, onSave, onCancel }: ProductFormProps) => 
                   value={formData.expirationDate}
                   onChange={(e) => handleInputChange('expirationDate', e.target.value)}
                   className="mt-1 flex h-10 w-full rounded-md border border-gray-600 
-             bg-gray-800 text-white px-3 py-2 text-sm
+             bg-background text-foreground px-3 py-2 text-sm
              focus:border-primary focus:ring-2 focus:ring-primary"
                 />
 

@@ -6,6 +6,7 @@ import {
   Package, 
   Home, 
   Receipt, 
+  ShoppingCart,
   FileBarChart, 
   LogOut, 
   User,
@@ -15,7 +16,8 @@ import {
 const navigation = [
   { name: 'หน้าหลัก', href: '/dashboard', icon: Home },
   { name: 'จัดการสินค้า', href: '/products', icon: Package },
-  { name: 'จัดการบิล / ขาย', href: '/bills', icon: Receipt },
+  { name: 'ขาย', href: '/sales', icon: ShoppingCart },
+  { name: 'บิล', href: '/bills', icon: Receipt },
   { name: 'รายงาน', href: '/reports', icon: FileBarChart },
 ];
 

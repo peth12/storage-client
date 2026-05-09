@@ -11,6 +11,7 @@ import { Products } from "@/pages/Products";
 import { Bills } from "@/pages/Bills";
 import { Reports } from "@/pages/Reports";
 import { BillExport } from "@/pages/BillExport";
+import { Sales } from "@/pages/Sales";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,8 @@ const App = () => (
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/products" element={<Products />} />
+                <Route path="/products/:productId" element={<Products />} />
+                <Route path="/sales" element={<Sales />} />
                 <Route path="/bills" element={<Bills />} />
                 <Route path="/bills/export/:billId" element={<BillExport />} />
                 <Route path="/reports" element={<Reports />} />

@@ -1,22 +1,32 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { LocalStorage } from '@/lib/storage';
-import { Product, Bill } from '@/types';
+import { Product, Bill, StockTransaction } from '@/types';
 import {
   Package,
   Receipt,
   TrendingUp,
   AlertTriangle,
   ArrowRight,
-  DollarSign
+  DollarSign,
+  Activity,
+  ShoppingCart
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ProductForm } from '@/components/products/ProductForm';
 import { useToast } from '@/hooks/use-toast';
-import { BillForm } from '@/components/bills/BillForm';
-import { set } from 'date-fns';
+import { getPeriodLabel, getPeriodRange, isWithinDateRange, periodOptions, ReportPeriod } from '@/lib/period';
+
+interface DashboardInformation {
+  totalBills: number;
+  totalProducts: number;
+  totalSoldProducts: number;
+  totalIncome: number;
+}
+
+const initialRange = getPeriodRange('day');
+const formatCurrency = (value = 0) => `฿${value.toLocaleString()}`;
 
 export const Dashboard = () => {
   const [lowProducts, setLowProducts] = useState<Product[]>([]);
@@ -24,31 +34,49 @@ export const Dashboard = () => {
   const [expiredProducts, setExpiredProducts] = useState<Product[]>([]);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [bills, setBills] = useState<Bill[]>([]);
+  const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [showBillForm, setShowBillForm] = useState(false);
-  const [information, setInformation] = useState<any>(null);
+  const [information, setInformation] = useState<DashboardInformation | null>(null);
+  const [period, setPeriod] = useState<ReportPeriod>('day');
+  const [startDate, setStartDate] = useState(initialRange.startInput);
+  const [endDate, setEndDate] = useState(initialRange.endInput);
   const API_HOST = import.meta.env.VITE_API_HOST;
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
     const fetchLowStockProducts = async () => {
-      const response = await axios.get(`${API_HOST}/api/products/low-stock`);
-      const responseProducts = await axios.get(`${API_HOST}/api/products`);
-      const responseExpired = await axios.get(`${API_HOST}/api/products/expired`);
-      const responseInformation = await axios.get(`${API_HOST}/api/dashboard`);
-      console.log('Low stock products:', response.data);
-      console.log('Expired products:', responseExpired.data);
+      const [
+        response,
+        responseProducts,
+        responseExpired,
+        responseInformation,
+        responseBills,
+        responseTransactions
+      ] = await Promise.all([
+        axios.get(`${API_HOST}/api/products/low-stock`),
+        axios.get(`${API_HOST}/api/products`, { params: { limit: 9999 } }),
+        axios.get(`${API_HOST}/api/products/expired`),
+        axios.get(`${API_HOST}/api/dashboard`),
+        axios.get(`${API_HOST}/api/bills`, { params: { limit: 9999 } }),
+        axios.get(`${API_HOST}/api/transactions`, { params: { limit: 9999 } }),
+      ]);
       setProducts(Array.isArray(responseProducts.data.items) ? responseProducts.data.items : []);
       setLowProducts(Array.isArray(response.data) ? response.data : []);
       setInformation(responseInformation.data);
-
-      setExpiredProducts(responseExpired.data);
-
-      // setBills();
+      setExpiredProducts(Array.isArray(responseExpired.data) ? responseExpired.data : []);
+      setBills(Array.isArray(responseBills.data.items) ? responseBills.data.items : []);
+      setTransactions(Array.isArray(responseTransactions.data.items) ? responseTransactions.data.items : []);
     };
     fetchLowStockProducts();
-  }, []);
+  }, [API_HOST]);
+
+  const handlePeriodChange = (nextPeriod: Exclude<ReportPeriod, 'custom'>) => {
+    const range = getPeriodRange(nextPeriod);
+    setPeriod(nextPeriod);
+    setStartDate(range.startInput);
+    setEndDate(range.endInput);
+  };
 
   const handleSaveProduct = async (productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (editingProduct) {
@@ -90,42 +118,29 @@ export const Dashboard = () => {
     setEditingProduct(null);
   };
 
-  const handleSaveBill = async (billData: Omit<Bill, 'id' | 'createdAt' | 'updatedAt'>) => {
-    try {
-      const payload = {
-        items: billData.items.map((item: any) => ({
-          productId: item.productId,
-          quantity: item.quantity
-        })),
-        status: billData.status,
-        createdBy: billData.createdBy
-      };
-      const response = await axios.post(`${API_HOST}/api/bills`, payload);
-      const newBill: Bill = {
-        ...response.data,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      setBills([...bills, newBill]);
-      setShowBillForm(false);
-      toast({
-        title: 'สร้างบิลสำเร็จ',
-        description: `บิลเลขที่ ${newBill.billNumber} ได้รับการสร้างแล้ว`
-      });
-    } catch (error) {
-      toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถสร้างบิลได้' });
-    }
-  };
-
-
-  const totalBills = bills.length;
-  const totalRevenue = bills
-    .filter(b => b.status === 'completed')
-    .reduce((sum, bill) => sum + bill.total, 0);
-
   const lowStockProducts = lowProducts;
 
-  const recentBills = bills
+  const periodLabel = getPeriodLabel(period, startDate, endDate);
+
+  const periodSummary = useMemo(() => {
+    const periodBills = bills.filter(bill => isWithinDateRange(bill.createdAt, startDate, endDate));
+    const completedBills = periodBills.filter(bill => bill.status === 'completed');
+    const periodTransactions = transactions.filter(transaction => isWithinDateRange(transaction.createdAt, startDate, endDate));
+    const soldItems = periodTransactions
+      .filter(transaction => transaction.type === 'out')
+      .reduce((sum, transaction) => sum + transaction.quantity, 0);
+    const totalRevenue = completedBills.reduce((sum, bill) => sum + bill.total, 0);
+
+    return {
+      totalBills: periodBills.length,
+      completedBills: completedBills.length,
+      totalRevenue,
+      soldItems,
+      transactions: periodTransactions.length,
+    };
+  }, [bills, transactions, startDate, endDate]);
+
+  const recentBills = [...bills]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
 
@@ -142,23 +157,28 @@ export const Dashboard = () => {
     );
   }
 
-  if (showBillForm) {
-    return (
-      <BillForm
-        products={products}
-        onSave={handleSaveBill}
-        onCancel={() => setShowBillForm(false)}
-      />
-    );
-  }
-
-
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">แดชบอร์ด</h1>
-        <p className="text-muted-foreground">ภาพรวมระบบจัดการสต็อกสินค้า</p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">แดชบอร์ด</h1>
+          <p className="text-muted-foreground">ภาพรวมระบบจัดการสต็อกสินค้า ({periodLabel})</p>
+        </div>
+        <div className="flex rounded-md border border-border bg-surface p-1">
+          {periodOptions.map(option => (
+            <Button
+              key={option.value}
+              type="button"
+              size="sm"
+              variant={period === option.value ? 'default' : 'ghost'}
+              onClick={() => handlePeriodChange(option.value)}
+              className={period === option.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -171,9 +191,9 @@ export const Dashboard = () => {
             <Package className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{information?.totalProducts}</div>
+            <div className="text-2xl font-bold text-foreground">{information?.totalProducts ?? 0}</div>
             <p className="text-xs text-muted-foreground">
-              สินค้าที่ใช้งาน {information?.totalProducts} รายการ
+              สินค้าทั้งระบบ
             </p>
           </CardContent>
         </Card>
@@ -186,7 +206,7 @@ export const Dashboard = () => {
             <AlertTriangle className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{information?.totalSoldProducts}</div>
+            <div className="text-2xl font-bold text-foreground">{information?.totalSoldProducts ?? 0}</div>
             <p className="text-xs text-muted-foreground">
               ต้องเติมสต็อก
             </p>
@@ -196,14 +216,14 @@ export const Dashboard = () => {
         <Card className="bg-surface border-border shadow-soft">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              บิลทั้งหมด
+              บิลเสร็จสิ้น
             </CardTitle>
             <Receipt className="h-4 w-4 text-info" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{information?.totalBills}</div>
+            <div className="text-2xl font-bold text-foreground">{periodSummary.completedBills}</div>
             <p className="text-xs text-muted-foreground">
-              ธุรกรรมทั้งหมด
+              จาก {periodSummary.totalBills} บิลในช่วงนี้
             </p>
           </CardContent>
         </Card>
@@ -217,11 +237,39 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              ฿{information?.totalIncome.toLocaleString()}
+              {formatCurrency(periodSummary.totalRevenue)}
             </div>
             <p className="text-xs text-muted-foreground">
-              จากบิลที่เสร็จสมบูรณ์
+              {periodLabel}
             </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="bg-surface border-border shadow-soft">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              จำนวนสินค้าที่ขายออก
+            </CardTitle>
+            <Activity className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{periodSummary.soldItems}</div>
+            <p className="text-xs text-muted-foreground">{periodLabel}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-surface border-border shadow-soft">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              รายการเคลื่อนไหวสต็อก
+            </CardTitle>
+            <TrendingUp className="h-4 w-4 text-accent" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{periodSummary.transactions}</div>
+            <p className="text-xs text-muted-foreground">{periodLabel}</p>
           </CardContent>
         </Card>
       </div>
@@ -397,12 +445,12 @@ export const Dashboard = () => {
             </Button>
 
             <Button
-              onClick={() => setShowBillForm(true)}
+              onClick={() => navigate('/sales')}
               className="h-20 bg-secondary hover:bg-secondary/90 text-secondary-foreground"
             >
               <div className="text-center">
-                <Receipt className="h-6 w-6 mx-auto mb-2" />
-                <span>สร้างบิลใหม่</span>
+                <ShoppingCart className="h-6 w-6 mx-auto mb-2" />
+                <span>ขายสินค้า</span>
               </div>
             </Button>
 

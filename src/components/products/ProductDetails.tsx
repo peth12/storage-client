@@ -11,6 +11,35 @@ interface ProductDetailsProps {
 }
 
 export const ProductDetails = ({ product, onBack, onEdit }: ProductDetailsProps) => {
+  const productCode = product.appId || product._id || product.id || '-';
+
+  const getExpirationState = (expirationDate?: string) => {
+    if (!expirationDate) return 'normal';
+
+    const today = new Date();
+    const exp = new Date(expirationDate);
+
+    today.setHours(0, 0, 0, 0);
+    exp.setHours(0, 0, 0, 0);
+
+    const diffTime = exp.getTime() - today.getTime();
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+    if (diffDays < 0) return 'expired';
+    if (diffDays <= 7) return 'expiring_soon';
+    return 'normal';
+  };
+
+  const getEffectiveStatus = (targetProduct: Product): Product['status'] => {
+    if (targetProduct.quantity === 0) return 'out_of_stock';
+    if (getExpirationState(targetProduct.expirationDate) === 'expired') return 'inactive';
+    if (targetProduct.status === 'out_of_stock') return 'active';
+    return targetProduct.status;
+  };
+
+  const effectiveStatus = getEffectiveStatus(product);
+  const expirationState = getExpirationState(product.expirationDate);
+
   const getStatusBadge = (status: Product['status']) => {
     const variants = {
       active: 'default',
@@ -29,6 +58,17 @@ export const ProductDetails = ({ product, onBack, onEdit }: ProductDetailsProps)
         {labels[status]}
       </Badge>
     );
+  };
+
+  const getExpirationBadge = () => {
+    if (effectiveStatus === 'out_of_stock') return null;
+    if (expirationState === 'expired') {
+      return <Badge className="bg-destructive text-destructive-foreground">หมดอายุ</Badge>;
+    }
+    if (expirationState === 'expiring_soon') {
+      return <Badge className="bg-yellow-500 text-black">ใกล้หมดอายุ</Badge>;
+    }
+    return null;
   };
 
   const formatDate = (dateString: string) => {
@@ -86,8 +126,12 @@ export const ProductDetails = ({ product, onBack, onEdit }: ProductDetailsProps)
                 <div>
                   <CardTitle className="text-xl text-foreground">{product.name}</CardTitle>
                   <p className="text-muted-foreground mt-1">{product.type}</p>
+                  <p className="text-xs font-mono text-muted-foreground mt-1">รหัส: {productCode}</p>
                 </div>
-                {getStatusBadge(product.status)}
+                <div className="flex flex-wrap justify-end gap-2">
+                  {getStatusBadge(effectiveStatus)}
+                  {getExpirationBadge()}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -188,14 +232,26 @@ export const ProductDetails = ({ product, onBack, onEdit }: ProductDetailsProps)
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">สถานะปัจจุบัน:</span>
-                  {getStatusBadge(product.status)}
+                  <span className="flex flex-wrap justify-end gap-2">
+                    {getStatusBadge(effectiveStatus)}
+                    {getExpirationBadge()}
+                  </span>
                 </div>
                 
-                {product.quantity === 0 && (
+                {effectiveStatus === 'out_of_stock' && (
                   <div className="p-3 bg-destructive/10 rounded-lg">
                     <div className="text-sm text-destructive font-medium">⚠️ สินค้าหมด</div>
                     <div className="text-xs text-destructive/80 mt-1">
                       ต้องเติมสต็อกก่อนขาย
+                    </div>
+                  </div>
+                )}
+
+                {expirationState === 'expired' && product.quantity > 0 && (
+                  <div className="p-3 bg-destructive/10 rounded-lg">
+                    <div className="text-sm text-destructive font-medium">⚠️ สินค้าหมดอายุ</div>
+                    <div className="text-xs text-destructive/80 mt-1">
+                      ไม่ควรขายสินค้านี้จนกว่าจะตรวจสอบหรือแก้ไขวันหมดอายุ
                     </div>
                   </div>
                 )}
@@ -217,9 +273,13 @@ export const ProductDetails = ({ product, onBack, onEdit }: ProductDetailsProps)
               <CardTitle>รหัสสินค้า</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-sm text-muted-foreground">Product ID</div>
+              <div className="text-sm text-muted-foreground">รหัสสินค้า</div>
               <div className="font-mono text-xs bg-surface-variant p-2 rounded mt-1">
-                {product.id}
+                {productCode}
+              </div>
+              <div className="text-sm text-muted-foreground mt-3">Database ID</div>
+              <div className="font-mono text-xs bg-surface-variant p-2 rounded mt-1">
+                {product._id || product.id}
               </div>
             </CardContent>
           </Card>
